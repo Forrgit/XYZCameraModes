@@ -1,0 +1,16 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "wzf-engine",
+	"Category": "",
+	"Description": "",
+	"Modules": [
+		{
+			"Name": "CameraModes",
+			"Type": "Runtime",
+			"LoadingPhase": "Default",
+			"AdditionalDependencies": [
+				"Engine"
+			]
+		}
+	]
+}
