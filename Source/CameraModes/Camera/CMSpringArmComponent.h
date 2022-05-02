@@ -1,5 +1,6 @@
 #pragma once
 
+#include "GameplayTagContainer.h"
 #include "CameraSubsystems/CMCameraSubsystem.h"
 #include "Components/SceneComponent.h"
 
@@ -28,7 +29,7 @@ public:
 	// End of USceneComponent interface
 
 	UFUNCTION(BlueprintCallable)
-	void SetCameraMode(UCMCameraMode* NewCameraMode);
+	void SetCameraMode(FGameplayTag CameraModeTag);
 	
 	UFUNCTION(BlueprintPure)
 	UCMCameraMode* GetCurrentCameraMode() const;
@@ -51,15 +52,29 @@ public:
 		}
 		return nullptr;
 	}
+
+	FRotator GetPlayerRotationInput() const;
+	
+	APlayerController* GetOwningController() const;
 	
 public:
 	UPROPERTY(EditAnywhere, Category="Camera Modes")
-	UCMCameraMode* InitialCameraMode;
+	TArray<UCMCameraMode*> CameraModes;
+	
+	UPROPERTY(EditAnywhere, Category="Camera Modes")
+	FGameplayTag InitialCameraModeTag;
 
+private:
+	void SetCameraMode(UCMCameraMode* NewCameraMode);
+	
+	void OnControllerRotationInput(FRotator InPlayerInput);
+	
 private:
 	UPROPERTY(Transient)
 	UCMCameraMode* CurrentCameraMode;
 	
 	UPROPERTY(Transient)
 	TArray<UCMCameraSubsystem*> CameraSubsystems;
+
+	FRotator PlayerRotationInput;
 };

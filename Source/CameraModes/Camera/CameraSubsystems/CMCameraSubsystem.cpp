@@ -6,6 +6,10 @@ void UCMCameraSubsystem::Tick(float DeltaTime)
 {
 }
 
+void UCMCameraSubsystem::OnEnterToCameraMode()
+{
+}
+
 void UCMCameraSubsystem::SetOwningSpringArm(UCMSpringArmComponent* SpringArm)
 {
 	check(OwningSpringArmComponent == nullptr)
@@ -31,4 +35,10 @@ APlayerController* UCMCameraSubsystem::GetOwningController() const
 {
 	const auto owningPawn = GetOwningPawn();
 	return owningPawn != nullptr ? owningPawn->GetController<APlayerController>() : nullptr;
+}
+
+APlayerCameraManager* UCMCameraSubsystem::GetCameraManager() const
+{
+	const auto controller = GetOwningController();
+	return controller != nullptr ? controller->PlayerCameraManager : nullptr;
 }

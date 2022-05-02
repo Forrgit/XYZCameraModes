@@ -10,8 +10,60 @@
 void UCMCameraSubsystem_Transform::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	
+	CurrentSocketOffset = FMath::VInterpConstantTo(CurrentSocketOffset, SocketOffset, DeltaTime, SocketOffsetSpeed);
+	CurrentTargetOffset = FMath::VInterpConstantTo(CurrentTargetOffset, TargetOffset, DeltaTime, TargetOffsetSpeed);
+	CurrentTargetArmLenght = FMath::FInterpConstantTo(CurrentTargetArmLenght, TargetArmLength, DeltaTime, TargetArmLengthSpeed);
 
+	if(const auto cameraManager = GetCameraManager())
+	{
+		cameraManager->ViewPitchMax = FMath::FInterpConstantTo(cameraManager->ViewPitchMax, ViewPitchMax, DeltaTime, ViewMinMaxSpeed);
+		cameraManager->ViewPitchMin = FMath::FInterpConstantTo(cameraManager->ViewPitchMin, ViewPitchMin, DeltaTime, ViewMinMaxSpeed);
+	}
+	
+	if(FMath::Abs(GetOwningSpringArm()->GetPlayerRotationInput().Pitch) < MinPlayerInputToStopDesiredViewPitch
+		&& GetOwningActor()->GetVelocity().SizeSquared() >= MinVelocityToActivateDesiredViewPitch * MinVelocityToActivateDesiredViewPitch)
+	{
+		const auto playerController = GetOwningController();
+		if(GetWorld()->GetTimeSeconds() > TimeBlockedDesiredView + MinTimeToActivateDesiredViewPitch)
+		{
+			const auto currentControlRotation = playerController->GetControlRotation();
+
+			auto resultControlRotation = currentControlRotation;
+			resultControlRotation.Pitch = DesiredViewPitch;
+			resultControlRotation = FMath::RInterpConstantTo(currentControlRotation, resultControlRotation, DeltaTime, ViewMinMaxSpeed);
+
+			playerController->SetControlRotation(resultControlRotation);
+		}
+	}
+	else
+	{
+		TimeBlockedDesiredView = GetWorld()->GetTimeSeconds();
+	}
+	
 	UpdateDesiredArmLocation(bDoCollisionTest, bEnableCameraLag, bEnableCameraRotationLag, DeltaTime);
+	
+}
+
+void UCMCameraSubsystem_Transform::OnEnterToCameraMode()
+{
+	Super::OnEnterToCameraMode();
+
+	if(const auto otherSubsystemTransform = GetOwningSpringArm()->GetCameraSubsystem<UCMCameraSubsystem_Transform>())
+	{
+		CurrentSocketOffset = otherSubsystemTransform->CurrentSocketOffset;
+		CurrentTargetOffset = otherSubsystemTransform->CurrentTargetOffset;
+		CurrentTargetArmLenght = otherSubsystemTransform->CurrentTargetArmLenght;
+		PreviousArmOrigin =  otherSubsystemTransform->PreviousArmOrigin;
+		PreviousDesiredLoc =  otherSubsystemTransform->PreviousDesiredLoc;
+		PreviousDesiredRot =  otherSubsystemTransform->PreviousDesiredRot;
+	}
+	else
+	{
+		CurrentSocketOffset = SocketOffset;
+		CurrentTargetOffset = TargetOffset;
+		CurrentTargetArmLenght = TargetArmLength;
+	}
 }
 
 FRotator UCMCameraSubsystem_Transform::GetDesiredRotation() const
@@ -103,7 +155,7 @@ void UCMCameraSubsystem_Transform::UpdateDesiredArmLocation(bool bDoTrace, bool 
 	PreviousDesiredRot = DesiredRot;
 
 	// Get the spring arm 'origin', the target we want to look at
-	FVector ArmOrigin = GetOwningSpringArm()->GetComponentLocation() + TargetOffset;
+	FVector ArmOrigin = GetOwningSpringArm()->GetComponentLocation() + CurrentTargetOffset;
 	// We lag the target, not the actual camera position, so rotating the camera around does not have lag
 	FVector DesiredLoc = ArmOrigin;
 	if (bDoLocationLag)
@@ -158,9 +210,9 @@ void UCMCameraSubsystem_Transform::UpdateDesiredArmLocation(bool bDoTrace, bool 
 	PreviousDesiredLoc = DesiredLoc;
 
 	// Now offset camera position back along our rotation
-	DesiredLoc -= DesiredRot.Vector() * TargetArmLength;
+	DesiredLoc -= DesiredRot.Vector() * CurrentTargetArmLenght;
 	// Add socket offset in local space
-	DesiredLoc += FRotationMatrix(DesiredRot).TransformVector(SocketOffset);
+	DesiredLoc += FRotationMatrix(DesiredRot).TransformVector(CurrentSocketOffset);
 
 	// Do a sweep to ensure we are not penetrating the world
 	FVector ResultLoc;

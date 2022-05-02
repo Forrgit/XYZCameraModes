@@ -7,14 +7,17 @@
 class AActor;
 class APawn;
 class APlayerController;
+class APlayerCameraManager;
 class UCMSpringArmComponent;
 
-UCLASS(Blueprintable, BlueprintType, Abstract)
+UCLASS(Blueprintable, BlueprintType, Abstract, EditInlineNew, DefaultToInstanced)
 class UCMCameraSubsystem : public UObject
 {
 	GENERATED_BODY()
 public:
 	virtual void Tick(float DeltaTime);
+
+	virtual void OnEnterToCameraMode();
 	
 	void SetOwningSpringArm(UCMSpringArmComponent* SpringArm);
 	UCMSpringArmComponent* GetOwningSpringArm() const;
@@ -23,6 +26,8 @@ public:
 	APawn* GetOwningPawn() const;
 
 	APlayerController* GetOwningController() const;
+
+	APlayerCameraManager* GetCameraManager() const;
 	
 private:
 	UPROPERTY()
