@@ -28,6 +28,9 @@ public:
 	virtual void QuerySupportedSockets(TArray<FComponentSocketDescription>& OutSockets) const override;
 	// End of USceneComponent interface
 
+	FVector GetCameraLocation() const;
+	FRotator GetCameraRotation() const;
+	
 	UFUNCTION(BlueprintCallable)
 	void SetCameraMode(FGameplayTag CameraModeTag);
 	
@@ -37,20 +40,12 @@ public:
 	UFUNCTION(BlueprintPure)
 	const TArray<UCMCameraSubsystem*>& GetCameraSubsystems() const;
 
+	UCMCameraSubsystem* GetCameraSubsystem(TSubclassOf<UCMCameraSubsystem> SubsystemClass) const;
+	
 	template<typename TSubsystem>
 	TSubsystem* GetCameraSubsystem() const
 	{
-		for(auto subsystem : CameraSubsystems)
-		{
-			if(subsystem != nullptr)
-			{
-				if(subsystem->GetClass()->IsChildOf(TSubsystem::StaticClass()))
-				{
-					return Cast<TSubsystem>(subsystem);
-				}
-			}
-		}
-		return nullptr;
+		return Cast<TSubsystem>(GetCameraSubsystem(TSubsystem::StaticClass()));
 	}
 
 	FRotator GetPlayerRotationInput() const;

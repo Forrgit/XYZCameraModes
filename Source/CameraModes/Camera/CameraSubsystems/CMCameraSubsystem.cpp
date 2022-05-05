@@ -6,8 +6,18 @@ void UCMCameraSubsystem::Tick(float DeltaTime)
 {
 }
 
-void UCMCameraSubsystem::OnEnterToCameraMode()
+void UCMCameraSubsystem::OnEnterToCameraMode(const FCMCameraSubsystemContext& Context)
 {
+}
+
+void UCMCameraSubsystem::SetSubsystemSettings(UCMCameraModeSubsystem_BaseSettings* NewSettings)
+{
+	
+}
+
+UCMCameraModeSubsystem_BaseSettings* UCMCameraSubsystem::GetSubsystemSettings() const
+{
+	return nullptr;
 }
 
 void UCMCameraSubsystem::SetOwningSpringArm(UCMSpringArmComponent* SpringArm)

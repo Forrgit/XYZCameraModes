@@ -7,31 +7,36 @@
 #include "DrawDebugHelpers.h"
 #include "CameraModes/Camera/CMSpringArmComponent.h"
 
+UCMCameraSubsystem_Transform::UCMCameraSubsystem_Transform()
+{
+	Settings = CreateDefaultSubobject<UCMCameraModeSubsystem_TransformSettings>("Settings");
+}
+
 void UCMCameraSubsystem_Transform::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	
-	CurrentSocketOffset = FMath::VInterpConstantTo(CurrentSocketOffset, SocketOffset, DeltaTime, SocketOffsetSpeed);
-	CurrentTargetOffset = FMath::VInterpConstantTo(CurrentTargetOffset, TargetOffset, DeltaTime, TargetOffsetSpeed);
-	CurrentTargetArmLenght = FMath::FInterpConstantTo(CurrentTargetArmLenght, TargetArmLength, DeltaTime, TargetArmLengthSpeed);
+	CurrentSocketOffset = FMath::VInterpConstantTo(CurrentSocketOffset, Settings->SocketOffset, DeltaTime, Settings->SocketOffsetSpeed);
+	CurrentTargetOffset = FMath::VInterpConstantTo(CurrentTargetOffset, Settings->TargetOffset, DeltaTime, Settings->TargetOffsetSpeed);
+	CurrentTargetArmLenght = FMath::FInterpConstantTo(CurrentTargetArmLenght, Settings->TargetArmLength, DeltaTime, Settings->TargetArmLengthSpeed);
 
 	if(const auto cameraManager = GetCameraManager())
 	{
-		cameraManager->ViewPitchMax = FMath::FInterpConstantTo(cameraManager->ViewPitchMax, ViewPitchMax, DeltaTime, ViewMinMaxSpeed);
-		cameraManager->ViewPitchMin = FMath::FInterpConstantTo(cameraManager->ViewPitchMin, ViewPitchMin, DeltaTime, ViewMinMaxSpeed);
+		cameraManager->ViewPitchMax = FMath::FInterpConstantTo(cameraManager->ViewPitchMax, Settings->ViewPitchMax, DeltaTime, Settings->ViewMinMaxSpeed);
+		cameraManager->ViewPitchMin = FMath::FInterpConstantTo(cameraManager->ViewPitchMin, Settings->ViewPitchMin, DeltaTime, Settings->ViewMinMaxSpeed);
 	}
 	
-	if(FMath::Abs(GetOwningSpringArm()->GetPlayerRotationInput().Pitch) < MinPlayerInputToStopDesiredViewPitch
-		&& GetOwningActor()->GetVelocity().SizeSquared() >= MinVelocityToActivateDesiredViewPitch * MinVelocityToActivateDesiredViewPitch)
+	if(FMath::Abs(GetOwningSpringArm()->GetPlayerRotationInput().Pitch) < Settings->MinPlayerInputToStopDesiredViewPitch
+		&& GetOwningActor()->GetVelocity().SizeSquared() >= Settings->MinVelocityToActivateDesiredViewPitch * Settings->MinVelocityToActivateDesiredViewPitch)
 	{
 		const auto playerController = GetOwningController();
-		if(GetWorld()->GetTimeSeconds() > TimeBlockedDesiredView + MinTimeToActivateDesiredViewPitch)
+		if(GetWorld()->GetTimeSeconds() > TimeBlockedDesiredView + Settings->MinTimeToActivateDesiredViewPitch)
 		{
 			const auto currentControlRotation = playerController->GetControlRotation();
 
 			auto resultControlRotation = currentControlRotation;
-			resultControlRotation.Pitch = DesiredViewPitch;
-			resultControlRotation = FMath::RInterpConstantTo(currentControlRotation, resultControlRotation, DeltaTime, ViewMinMaxSpeed);
+			resultControlRotation.Pitch = Settings->DesiredViewPitch;
+			resultControlRotation = FMath::RInterpConstantTo(currentControlRotation, resultControlRotation, DeltaTime, Settings->ViewMinMaxSpeed);
 
 			playerController->SetControlRotation(resultControlRotation);
 		}
@@ -41,29 +46,30 @@ void UCMCameraSubsystem_Transform::Tick(float DeltaTime)
 		TimeBlockedDesiredView = GetWorld()->GetTimeSeconds();
 	}
 	
-	UpdateDesiredArmLocation(bDoCollisionTest, bEnableCameraLag, bEnableCameraRotationLag, DeltaTime);
+	UpdateDesiredArmLocation(Settings->bDoCollisionTest, Settings->bEnableCameraLag, Settings->bEnableCameraRotationLag, DeltaTime);
 	
 }
 
-void UCMCameraSubsystem_Transform::OnEnterToCameraMode()
+void UCMCameraSubsystem_Transform::OnEnterToCameraMode(const FCMCameraSubsystemContext& Context)
 {
-	Super::OnEnterToCameraMode();
+	Super::OnEnterToCameraMode(Context);
 
-	if(const auto otherSubsystemTransform = GetOwningSpringArm()->GetCameraSubsystem<UCMCameraSubsystem_Transform>())
+	if(!Context.bWithInterpolation)
 	{
-		CurrentSocketOffset = otherSubsystemTransform->CurrentSocketOffset;
-		CurrentTargetOffset = otherSubsystemTransform->CurrentTargetOffset;
-		CurrentTargetArmLenght = otherSubsystemTransform->CurrentTargetArmLenght;
-		PreviousArmOrigin =  otherSubsystemTransform->PreviousArmOrigin;
-		PreviousDesiredLoc =  otherSubsystemTransform->PreviousDesiredLoc;
-		PreviousDesiredRot =  otherSubsystemTransform->PreviousDesiredRot;
+		CurrentSocketOffset = Settings->SocketOffset;
+		CurrentTargetOffset = Settings->TargetOffset;
+		CurrentTargetArmLenght = Settings->TargetArmLength;
 	}
-	else
-	{
-		CurrentSocketOffset = SocketOffset;
-		CurrentTargetOffset = TargetOffset;
-		CurrentTargetArmLenght = TargetArmLength;
-	}
+}
+
+void UCMCameraSubsystem_Transform::SetSubsystemSettings(UCMCameraModeSubsystem_BaseSettings* NewSettings)
+{
+	Settings = Cast<UCMCameraModeSubsystem_TransformSettings>(NewSettings);
+}
+
+UCMCameraModeSubsystem_BaseSettings* UCMCameraSubsystem_Transform::GetSubsystemSettings() const
+{
+	return Settings;
 }
 
 FRotator UCMCameraSubsystem_Transform::GetDesiredRotation() const
@@ -75,7 +81,7 @@ FRotator UCMCameraSubsystem_Transform::GetTargetRotation() const
 {
 	FRotator DesiredRot = GetDesiredRotation();
 
-	if (bUsePawnControlRotation)
+	if (Settings->bUsePawnControlRotation)
 	{
 		if (APawn* OwningPawn = GetOwningPawn())
 		{
@@ -91,17 +97,17 @@ FRotator UCMCameraSubsystem_Transform::GetTargetRotation() const
 	if (!GetOwningSpringArm()->IsUsingAbsoluteRotation())
 	{
 		const FRotator LocalRelativeRotation = GetSocketTransform(NAME_None, ERelativeTransformSpace::RTS_Component).Rotator();
-		if (!bInheritPitch)
+		if (!Settings->bInheritPitch)
 		{
 			DesiredRot.Pitch = LocalRelativeRotation.Pitch;
 		}
 
-		if (!bInheritYaw)
+		if (!Settings->bInheritYaw)
 		{
 			DesiredRot.Yaw = LocalRelativeRotation.Yaw;
 		}
 
-		if (!bInheritRoll)
+		if (!Settings->bInheritRoll)
 		{
 			DesiredRot.Roll = LocalRelativeRotation.Roll;
 		}
@@ -132,24 +138,24 @@ void UCMCameraSubsystem_Transform::UpdateDesiredArmLocation(bool bDoTrace, bool 
 	// Apply 'lag' to rotation if desired
 	if(bDoRotationLag)
 	{
-		if (bUseCameraLagSubstepping && DeltaTime > CameraLagMaxTimeStep && CameraRotationLagSpeed > 0.f)
+		if (Settings->bUseCameraLagSubstepping && DeltaTime > Settings->CameraLagMaxTimeStep && Settings->CameraRotationLagSpeed > 0.f)
 		{
 			const FRotator ArmRotStep = (DesiredRot - PreviousDesiredRot).GetNormalized() * (1.f / DeltaTime);
 			FRotator LerpTarget = PreviousDesiredRot;
 			float RemainingTime = DeltaTime;
 			while (RemainingTime > KINDA_SMALL_NUMBER)
 			{
-				const float LerpAmount = FMath::Min(CameraLagMaxTimeStep, RemainingTime);
+				const float LerpAmount = FMath::Min(Settings->CameraLagMaxTimeStep, RemainingTime);
 				LerpTarget += ArmRotStep * LerpAmount;
 				RemainingTime -= LerpAmount;
 
-				DesiredRot = FRotator(FMath::QInterpTo(FQuat(PreviousDesiredRot), FQuat(LerpTarget), LerpAmount, CameraRotationLagSpeed));
+				DesiredRot = FRotator(FMath::QInterpTo(FQuat(PreviousDesiredRot), FQuat(LerpTarget), LerpAmount, Settings->CameraRotationLagSpeed));
 				PreviousDesiredRot = DesiredRot;
 			}
 		}
 		else
 		{
-			DesiredRot = FRotator(FMath::QInterpTo(FQuat(PreviousDesiredRot), FQuat(DesiredRot), DeltaTime, CameraRotationLagSpeed));
+			DesiredRot = FRotator(FMath::QInterpTo(FQuat(PreviousDesiredRot), FQuat(DesiredRot), DeltaTime, Settings->CameraRotationLagSpeed));
 		}
 	}
 	PreviousDesiredRot = DesiredRot;
@@ -160,7 +166,7 @@ void UCMCameraSubsystem_Transform::UpdateDesiredArmLocation(bool bDoTrace, bool 
 	FVector DesiredLoc = ArmOrigin;
 	if (bDoLocationLag)
 	{
-		if (bUseCameraLagSubstepping && DeltaTime > CameraLagMaxTimeStep && CameraLagSpeed > 0.f)
+		if (Settings->bUseCameraLagSubstepping && DeltaTime > Settings->CameraLagMaxTimeStep && Settings->CameraLagSpeed > 0.f)
 		{
 			const FVector ArmMovementStep = (DesiredLoc - PreviousDesiredLoc) * (1.f / DeltaTime);
 			FVector LerpTarget = PreviousDesiredLoc;
@@ -168,33 +174,33 @@ void UCMCameraSubsystem_Transform::UpdateDesiredArmLocation(bool bDoTrace, bool 
 			float RemainingTime = DeltaTime;
 			while (RemainingTime > KINDA_SMALL_NUMBER)
 			{
-				const float LerpAmount = FMath::Min(CameraLagMaxTimeStep, RemainingTime);
+				const float LerpAmount = FMath::Min(Settings->CameraLagMaxTimeStep, RemainingTime);
 				LerpTarget += ArmMovementStep * LerpAmount;
 				RemainingTime -= LerpAmount;
 
-				DesiredLoc = FMath::VInterpTo(PreviousDesiredLoc, LerpTarget, LerpAmount, CameraLagSpeed);
+				DesiredLoc = FMath::VInterpTo(PreviousDesiredLoc, LerpTarget, LerpAmount, Settings->CameraLagSpeed);
 				PreviousDesiredLoc = DesiredLoc;
 			}
 		}
 		else
 		{
-			DesiredLoc = FMath::VInterpTo(PreviousDesiredLoc, DesiredLoc, DeltaTime, CameraLagSpeed);
+			DesiredLoc = FMath::VInterpTo(PreviousDesiredLoc, DesiredLoc, DeltaTime, Settings->CameraLagSpeed);
 		}
 
 		// Clamp distance if requested
 		bool bClampedDist = false;
-		if (CameraLagMaxDistance > 0.f)
+		if (Settings->CameraLagMaxDistance > 0.f)
 		{
 			const FVector FromOrigin = DesiredLoc - ArmOrigin;
-			if (FromOrigin.SizeSquared() > FMath::Square(CameraLagMaxDistance))
+			if (FromOrigin.SizeSquared() > FMath::Square(Settings->CameraLagMaxDistance))
 			{
-				DesiredLoc = ArmOrigin + FromOrigin.GetClampedToMaxSize(CameraLagMaxDistance);
+				DesiredLoc = ArmOrigin + FromOrigin.GetClampedToMaxSize(Settings->CameraLagMaxDistance);
 				bClampedDist = true;
 			}
 		}		
 
 #if !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
-		if (bDrawDebugLagMarkers)
+		if (Settings->bDrawDebugLagMarkers)
 		{
 			DrawDebugSphere(GetWorld(), ArmOrigin, 5.f, 8, FColor::Green);
 			DrawDebugSphere(GetWorld(), DesiredLoc, 5.f, 8, FColor::Yellow);
@@ -216,13 +222,13 @@ void UCMCameraSubsystem_Transform::UpdateDesiredArmLocation(bool bDoTrace, bool 
 
 	// Do a sweep to ensure we are not penetrating the world
 	FVector ResultLoc;
-	if (bDoTrace && (TargetArmLength != 0.0f))
+	if (bDoTrace && (Settings->TargetArmLength != 0.0f))
 	{
 		bIsCameraFixed = true;
 		FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(SpringArm), false, GetOwningActor());
 
 		FHitResult Result;
-		GetWorld()->SweepSingleByChannel(Result, ArmOrigin, DesiredLoc, FQuat::Identity, ProbeChannel, FCollisionShape::MakeSphere(ProbeSize), QueryParams);
+		GetWorld()->SweepSingleByChannel(Result, ArmOrigin, DesiredLoc, FQuat::Identity, Settings->ProbeChannel, FCollisionShape::MakeSphere(Settings->ProbeSize), QueryParams);
 		
 		UnfixedCameraPosition = DesiredLoc;
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Engine/DataAsset.h"
 
 #include "CMCameraSubsystem.generated.h"
 
@@ -10,6 +11,18 @@ class APlayerController;
 class APlayerCameraManager;
 class UCMSpringArmComponent;
 
+struct FCMCameraSubsystemContext
+{
+public:
+	bool bWithInterpolation = true;
+};
+
+UCLASS(EditInlineNew, DefaultToInstanced, Abstract)
+class UCMCameraModeSubsystem_BaseSettings : public UDataAsset
+{
+	GENERATED_BODY()
+};
+
 UCLASS(Blueprintable, BlueprintType, Abstract, EditInlineNew, DefaultToInstanced)
 class UCMCameraSubsystem : public UObject
 {
@@ -17,7 +30,10 @@ class UCMCameraSubsystem : public UObject
 public:
 	virtual void Tick(float DeltaTime);
 
-	virtual void OnEnterToCameraMode();
+	virtual void OnEnterToCameraMode(const FCMCameraSubsystemContext& Context);
+
+	virtual void SetSubsystemSettings(UCMCameraModeSubsystem_BaseSettings* NewSettings);
+	virtual UCMCameraModeSubsystem_BaseSettings* GetSubsystemSettings() const;
 	
 	void SetOwningSpringArm(UCMSpringArmComponent* SpringArm);
 	UCMSpringArmComponent* GetOwningSpringArm() const;

@@ -45,29 +45,33 @@ void UCMSpringArmComponent::SetCameraMode(UCMCameraMode* NewCameraMode)
 {
 	if(NewCameraMode != nullptr && CurrentCameraMode != NewCameraMode)
 	{
+		FCMCameraSubsystemContext subsystemContext;
+		subsystemContext.bWithInterpolation = CurrentCameraMode != nullptr;
+		
 		CurrentCameraMode = NewCameraMode;
-
-		TArray<UCMCameraSubsystem*> newCameraSubsystems;
+		
 		for(const auto subsystemTemplate : CurrentCameraMode->CameraSubsystems)
 		{
 			if(subsystemTemplate != nullptr)
 			{
-				const auto subsystem = DuplicateObject<UCMCameraSubsystem>(subsystemTemplate, this);
-				//const auto subsystem = NewObject<UCMCameraSubsystem>(this, subsystemTemplate);
-				subsystem->SetOwningSpringArm(this);
-				subsystem->OnEnterToCameraMode();
-				newCameraSubsystems.Add(subsystem);
-			}
-		}
+				UCMCameraSubsystem* subsystem = nullptr;
+				
+				if(const auto existSubsystem = GetCameraSubsystem(subsystemTemplate->GetClass()))
+				{
+					subsystem = existSubsystem;
+					subsystem->SetSubsystemSettings(subsystemTemplate->GetSubsystemSettings());
+				}
+				else
+				{
+					subsystem = DuplicateObject<UCMCameraSubsystem>(subsystemTemplate, this);
+					subsystem->SetOwningSpringArm(this);
+					
+					CameraSubsystems.Add(subsystem);
+				}
 
-		for(const auto subsystem : CameraSubsystems)
-		{
-			if(subsystem != nullptr)
-			{
-				subsystem->ConditionalBeginDestroy();
+				subsystem->OnEnterToCameraMode(subsystemContext);
 			}
 		}
-		CameraSubsystems = newCameraSubsystems;
 	}
 }
 
@@ -85,6 +89,25 @@ UCMCameraMode* UCMSpringArmComponent::GetCurrentCameraMode() const
 const TArray<UCMCameraSubsystem*>& UCMSpringArmComponent::GetCameraSubsystems() const
 {
 	return CameraSubsystems;
+}
+
+UCMCameraSubsystem* UCMSpringArmComponent::GetCameraSubsystem(TSubclassOf<UCMCameraSubsystem> SubsystemClass) const
+{
+	if(SubsystemClass != nullptr)
+	{
+		for(const auto subsystem : CameraSubsystems)
+		{
+			if(subsystem != nullptr)
+			{
+				if(subsystem->GetClass()->IsChildOf(SubsystemClass))
+				{
+					return subsystem;
+				}
+			}
+		}	
+	}
+	
+	return nullptr;
 }
 
 FRotator UCMSpringArmComponent::GetPlayerRotationInput() const
@@ -131,7 +154,7 @@ void UCMSpringArmComponent::TickComponent(float DeltaTime, enum ELevelTick TickT
 	{
 		for(const auto subsystem : CameraSubsystems)
 		{
-			if(subsystem != nullptr)
+			if(subsystem != nullptr && subsystem->GetSubsystemSettings() != nullptr)
 			{
 				subsystem->Tick(DeltaTime);
 			}
@@ -160,5 +183,15 @@ bool UCMSpringArmComponent::HasAnySockets() const
 void UCMSpringArmComponent::QuerySupportedSockets(TArray<FComponentSocketDescription>& OutSockets) const
 {
 	//new (OutSockets) FComponentSocketDescription(SocketName, EComponentSocketType::Socket);
+}
+
+FVector UCMSpringArmComponent::GetCameraLocation() const
+{
+	return GetSocketTransform(NAME_None, ERelativeTransformSpace::RTS_World).GetLocation();
+}
+
+FRotator UCMSpringArmComponent::GetCameraRotation() const
+{
+	return GetSocketTransform(NAME_None, ERelativeTransformSpace::RTS_World).Rotator();
 }
 

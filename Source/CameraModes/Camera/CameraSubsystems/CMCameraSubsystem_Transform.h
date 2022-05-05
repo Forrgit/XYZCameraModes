@@ -5,54 +5,30 @@
 #include "CMCameraSubsystem_Transform.generated.h"
 
 UCLASS()
-class UCMCameraSubsystem_Transform : public UCMCameraSubsystem 
+class UCMCameraModeSubsystem_TransformSettings : public UCMCameraModeSubsystem_BaseSettings
 {
 	GENERATED_BODY()
-
 public:
-	virtual void Tick(float DeltaTime) override;
-
-	virtual void OnEnterToCameraMode() override;
-	
-	/**
-	* Get the target rotation we inherit, used as the base target for the boom rotation.
-	* This is derived from attachment to our parent and considering the UsePawnControlRotation and absolute rotation flags.
-	*/
-	UFUNCTION(BlueprintCallable, Category=SpringArm)
-	FRotator GetTargetRotation() const;
-
-	UFUNCTION(BlueprintPure)
-	FVector GetCameraLocation() const;
-	UFUNCTION(BlueprintPure)
-	FRotator GetCameraRotation() const;
-
-	UFUNCTION(BlueprintPure)
-	FTransform GetCameraTransform() const;
-	
-	FTransform GetSocketTransform(FName InSocketName, ERelativeTransformSpace TransformSpace = RTS_World) const;
-	
-#pragma region Parameters
-public:
-	/** Natural length of the spring arm when there are no collisions */
+		/** Natural length of the spring arm when there are no collisions */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Camera)
 	float TargetArmLength = 300.f;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Camera)
-	float TargetArmLengthSpeed = 1.f;
+	float TargetArmLengthSpeed = 60.f;
 	
 	/** offset at end of spring arm; use this instead of the relative offset of the attached component to ensure the line trace works as desired */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Camera)
 	FVector SocketOffset = FVector::ZeroVector;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Camera)
-	float SocketOffsetSpeed = 1.f;
+	float SocketOffsetSpeed = 30.f;
 
 	/** Offset at start of spring, applied in world space. Use this if you want a world-space offset from the parent component instead of the usual relative-space offset. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Camera)
 	FVector TargetOffset = FVector::ZeroVector;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Camera)
-	float TargetOffsetSpeed = 1.f;
+	float TargetOffsetSpeed = 30.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=View)
 	float ViewPitchMin = -40.f;
@@ -96,7 +72,7 @@ public:
 	 * @see GetTargetRotation(), APawn::GetViewRotation()
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=CameraSettings)
-	bool bUsePawnControlRotation = false;
+	bool bUsePawnControlRotation = true;
 
 	/** Should we inherit pitch from parent component. Does nothing if using Absolute Rotation. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=CameraSettings)
@@ -153,8 +129,43 @@ public:
 	/** Max distance the camera target may lag behind the current location. If set to zero, no max distance is enforced. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Lag, meta=(editcondition="bEnableCameraLag", ClampMin="0.0", UIMin = "0.0"))
 	float CameraLagMaxDistance = 0.f;
+};
+
+UCLASS()
+class UCMCameraSubsystem_Transform : public UCMCameraSubsystem 
+{
+	GENERATED_BODY()
+
+public:
+	UCMCameraSubsystem_Transform();
 	
-#pragma endregion
+	virtual void Tick(float DeltaTime) override;
+
+	virtual void OnEnterToCameraMode(const FCMCameraSubsystemContext& Context) override;
+
+	virtual void SetSubsystemSettings(UCMCameraModeSubsystem_BaseSettings* Settings) override;
+	virtual UCMCameraModeSubsystem_BaseSettings* GetSubsystemSettings() const override;
+	
+	/**
+	* Get the target rotation we inherit, used as the base target for the boom rotation.
+	* This is derived from attachment to our parent and considering the UsePawnControlRotation and absolute rotation flags.
+	*/
+	UFUNCTION(BlueprintCallable, Category=SpringArm)
+	FRotator GetTargetRotation() const;
+
+	UFUNCTION(BlueprintPure)
+	FVector GetCameraLocation() const;
+	UFUNCTION(BlueprintPure)
+	FRotator GetCameraRotation() const;
+
+	UFUNCTION(BlueprintPure)
+	FTransform GetCameraTransform() const;
+	
+	FTransform GetSocketTransform(FName InSocketName, ERelativeTransformSpace TransformSpace = RTS_World) const;
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Instanced)
+	UCMCameraModeSubsystem_TransformSettings* Settings;
 
 protected:
 	FVector CurrentSocketOffset = FVector::ZeroVector;
